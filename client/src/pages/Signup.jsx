@@ -68,12 +68,12 @@ export default function Signup() {
               </div>
 
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.8125rem', color: '#A0A0A8', cursor: 'pointer', lineHeight: 1.5 }}>
-                <input type="checkbox" checked={agreedToTerms} onChange={function (e) { setAgreedToTerms(e.target.checked); }} style={{ marginTop: 3, flexShrink: 0, accentColor: '#10B981' }} />
+                <input type="checkbox" checked={agreedToTerms} onChange={function (e) { setAgreedToTerms(e.target.checked); }} style={{ marginTop: 3, flexShrink: 0, accentColor: '#22D3EE' }} />
                 <span>
                   I agree to the{' '}
-                  <a href="https://tradepals.net/windpal/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#10B981' }}>Terms of Service</a>{' '}
+                  <a href="https://tradepals.net/windpal/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#22D3EE' }}>Terms of Service</a>{' '}
                   and{' '}
-                  <a href="https://tradepals.net/windpal/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#10B981' }}>Privacy Policy</a>.
+                  <a href="https://tradepals.net/windpal/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#22D3EE' }}>Privacy Policy</a>.
                 </span>
               </label>
 

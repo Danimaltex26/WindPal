@@ -62,7 +62,7 @@ var TABS = [
   },
 ];
 
-var ACTIVE_COLOR = '#10B981';
+var ACTIVE_COLOR = '#22D3EE';
 
 export default function TabLayout() {
   return (

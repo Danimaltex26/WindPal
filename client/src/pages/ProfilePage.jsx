@@ -124,7 +124,7 @@ export default function ProfilePage() {
     var pct = Math.min((used / limit) * 100, 100);
     return (
       <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 4, height: 8, overflow: 'hidden', marginTop: 4 }}>
-        <div style={{ width: pct + '%', height: '100%', background: '#10B981', borderRadius: 4, transition: 'width 0.3s' }} />
+        <div style={{ width: pct + '%', height: '100%', background: '#22D3EE', borderRadius: 4, transition: 'width 0.3s' }} />
       </div>
     );
   }

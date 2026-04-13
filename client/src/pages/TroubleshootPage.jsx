@@ -170,7 +170,7 @@ export default function TroubleshootPage() {
                 return (
                   <div key={i} style={{ paddingBottom: '0.75rem', borderBottom: '1px solid #2A2A2E' }}>
                     <div className="row" style={{ gap: '0.5rem', marginBottom: '0.25rem' }}>
-                      <span style={{ fontWeight: 700, color: '#10B981', minWidth: 24 }}>{'#' + (c.rank || i + 1)}</span>
+                      <span style={{ fontWeight: 700, color: '#22D3EE', minWidth: 24 }}>{'#' + (c.rank || i + 1)}</span>
                       <strong>{c.cause}</strong>
                       {c.likelihood && (
                         <span className={'badge ' + (c.likelihood === 'high' ? 'badge-red' : c.likelihood === 'medium' ? 'badge-amber' : 'badge-gray')}>
@@ -193,7 +193,7 @@ export default function TroubleshootPage() {
               {result.step_by_step_fix.map(function (s, i) {
                 return (
                   <div key={i} className="row" style={{ gap: '0.5rem', alignItems: 'flex-start' }}>
-                    <span style={{ fontWeight: 700, color: '#10B981', minWidth: 24 }}>{s.step || i + 1}</span>
+                    <span style={{ fontWeight: 700, color: '#22D3EE', minWidth: 24 }}>{s.step || i + 1}</span>
                     <div>
                       <p>{s.action}</p>
                       {s.tip && <p className="text-secondary" style={{ fontSize: '0.8125rem', marginTop: '0.25rem' }}>{'Tip: ' + s.tip}</p>}
@@ -265,7 +265,7 @@ export default function TroubleshootPage() {
           {messages.map(function (msg, i) {
             if (msg.role === 'user') {
               return (
-                <div key={i} className="card" style={{ borderColor: '#10B981', borderWidth: 1 }}>
+                <div key={i} className="card" style={{ borderColor: '#22D3EE', borderWidth: 1 }}>
                   <p className="text-secondary" style={{ fontSize: '0.75rem', marginBottom: '0.25rem' }}>You</p>
                   <p>{msg.content}</p>
                 </div>

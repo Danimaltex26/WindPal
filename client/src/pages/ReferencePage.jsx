@@ -29,7 +29,7 @@ function QuickRanges() {
             return (
               <tr key={r.param} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <td style={{ padding: 6, fontWeight: 500 }}>{r.param}</td>
-                <td style={{ padding: 6, color: '#10B981' }}>{r.ideal}</td>
+                <td style={{ padding: 6, color: '#22D3EE' }}>{r.ideal}</td>
                 <td style={{ padding: 6, color: '#aaa' }}>{r.note}</td>
               </tr>
             );
@@ -129,7 +129,7 @@ export default function ReferencePage() {
                       return (
                         <div key={j} style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, auto) 1fr', gap: '0.25rem 0.75rem', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                           <span className="text-secondary" style={{ fontSize: '0.8125rem' }}>{kv.label}</span>
-                          <span style={{ fontSize: '0.8125rem', color: '#10B981' }}>{kv.value}</span>
+                          <span style={{ fontSize: '0.8125rem', color: '#22D3EE' }}>{kv.value}</span>
                         </div>
                       );
                     })}
