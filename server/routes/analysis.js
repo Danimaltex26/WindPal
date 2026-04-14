@@ -125,7 +125,7 @@ router.post("/", auth, upload.array("images", 4), async function (req, res) {
 
     if (insertResult.error) {
       console.error("Save error:", insertResult.error);
-      return res.json({ result: result, saved: false, save_error: insertResult.error.message });
+      return res.json({ result: result, saved: false, save_error: insertResult.error.message, model: aiResult.model });
     }
 
     // Send email notification (fire-and-forget, don't block response)
@@ -136,7 +136,7 @@ router.post("/", auth, upload.array("images", 4), async function (req, res) {
       analysisType: result.analysis_type || analysis_type || "general",
     }).catch(function () {});
 
-    return res.json({ result: result, record_id: insertResult.data.id });
+    return res.json({ result: result, record_id: insertResult.data.id, model: aiResult.model });
   } catch (err) {
     console.error("Turbine analysis error:", err);
     return res.status(500).json({ error: "Internal server error" });

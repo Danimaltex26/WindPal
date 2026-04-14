@@ -39,6 +39,7 @@ export default function InspectPage() {
   const [componentType, setComponentType] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [model, setModel] = useState('');
   const [error, setError] = useState('');
   var fileInputRef = useRef(null);
 
@@ -59,6 +60,7 @@ export default function InspectPage() {
     try {
       var data = await apiUpload('/inspect', formData);
       setResult(data.result);
+      setModel(data.model || '');
     } catch (err) {
       setError(err.message || 'Failed to analyze. Please try again.');
     } finally {
@@ -69,6 +71,7 @@ export default function InspectPage() {
 
   function handleReset() {
     setResult(null);
+    setModel('');
     setError('');
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
@@ -86,7 +89,7 @@ export default function InspectPage() {
       <div className="page">
         <div className="stack">
           <div className="page-header">
-            <h2>Inspection Result</h2>
+            <h2 style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>Inspection Result {model && <span style={{ fontSize: '0.6875rem', fontWeight: 400, color: '#6B6B73' }}>{model}</span>}</h2>
           </div>
 
           {result.plain_english_summary && (

@@ -157,7 +157,7 @@ router.post("/query", auth, async function (req, res) {
     if (insertResult.error) console.error("Reference insert error:", insertResult.error);
 
     await supabaseService.from("reference_queries").insert({ user_id: userId, query: searchTerm, source: "ai" });
-    return res.json({ result: insertResult.data || result, source: "ai" });
+    return res.json({ result: insertResult.data || result, source: "ai", model: aiResult.model });
   } catch (err) {
     console.error("Reference query error:", err);
     return res.status(500).json({ error: "Internal server error" });

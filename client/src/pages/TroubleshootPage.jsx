@@ -83,6 +83,7 @@ export default function TroubleshootPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [messages, setMessages] = useState([]);
+  const [model, setModel] = useState('');
   const [followUp, setFollowUp] = useState('');
 
   function set(field, value) {
@@ -104,6 +105,7 @@ export default function TroubleshootPage() {
     try {
       var data = await apiPost('/troubleshoot', form);
       var result = data.result || data;
+      setModel(data.model || '');
       setMessages([
         { role: 'user', content: form.symptoms },
         { role: 'assistant', data: result },
@@ -132,6 +134,7 @@ export default function TroubleshootPage() {
         environment: form.environment,
       });
       var result = data.result || data;
+      setModel(data.model || '');
       setMessages(newMessages.concat([{ role: 'assistant', data: result }]));
     } catch (err) {
       setError(err.message || 'Follow-up failed.');
@@ -142,6 +145,7 @@ export default function TroubleshootPage() {
 
   function handleReset() {
     setMessages([]);
+    setModel('');
     setError('');
     setFollowUp('');
     setForm({
@@ -259,7 +263,7 @@ export default function TroubleshootPage() {
       <div className="page">
         <div className="stack">
           <div className="page-header">
-            <h2>Troubleshoot</h2>
+            <h2 style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>Diagnosis {model && <span style={{ fontSize: '0.6875rem', fontWeight: 400, color: '#6B6B73' }}>{model}</span>}</h2>
           </div>
 
           {messages.map(function (msg, i) {
