@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
-import Anthropic from "@anthropic-ai/sdk";
 import auth from "../middleware/auth.js";
+import { callClaude } from "../utils/claudeClient.js";
+import { requiresSpecificClause } from "../utils/modelRouter.js";
 
 var router = Router();
 
@@ -10,8 +11,6 @@ var supabaseService = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY,
   { db: { schema: "windpal" } }
 );
-
-var anthropic = new Anthropic();
 
 var WIND_REFERENCE_SYSTEM_PROMPT = "You are a wind turbine technical reference database specializing in IEC 61400 standards, turbine specifications, component specs, torque values, fluid specifications, safety standards, and electrical systems for wind energy. Answer questions about turbine models, maintenance procedures, torque specifications, lubricant types, safety requirements, and electrical configurations.\n" +
 "\n" +
@@ -110,19 +109,13 @@ router.post("/query", auth, async function (req, res) {
     }
 
     // Step 2 -- Claude
-    var message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 4096,
-      system: WIND_REFERENCE_SYSTEM_PROMPT,
+    var feature = requiresSpecificClause(searchTerm) ? 'code_citation' : 'reference_lookup';
+    var aiResult = await callClaude({
+      feature: feature,
+      systemPrompt: WIND_REFERENCE_SYSTEM_PROMPT,
       messages: [{ role: "user", content: query }],
     });
-
-    if (message.stop_reason === "max_tokens") {
-      console.error("Reference response truncated (max_tokens)");
-      return res.status(500).json({ error: "AI response was too long. Please try a more specific question." });
-    }
-
-    var rawText = message.content[0].text;
+    var rawText = aiResult.content;
     var result;
     try {
       var stripped = rawText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();

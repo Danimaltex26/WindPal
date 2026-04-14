@@ -1,8 +1,8 @@
 import { Router } from "express";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
-import Anthropic from "@anthropic-ai/sdk";
 import auth from "../middleware/auth.js";
+import { callClaude } from "../utils/claudeClient.js";
 import { WIND_ANALYSIS_SYSTEM_PROMPT } from "../prompts/analysis.js";
 import { sendAnalysisReadyEmail } from "../utils/email.js";
 
@@ -14,8 +14,6 @@ var supabaseService = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY,
   { db: { schema: "windpal" } }
 );
-
-var anthropic = new Anthropic();
 
 router.post("/", auth, upload.array("images", 4), async function (req, res) {
   try {
@@ -81,19 +79,12 @@ router.post("/", auth, upload.array("images", 4), async function (req, res) {
       text: "Analyze this wind turbine component photo. Analysis type hint: " + (analysis_type || "general") + ". Return your analysis as the specified JSON object.",
     });
 
-    var message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 4096,
-      system: WIND_ANALYSIS_SYSTEM_PROMPT,
+    var aiResult = await callClaude({
+      feature: 'photo_diagnosis',
+      systemPrompt: WIND_ANALYSIS_SYSTEM_PROMPT,
       messages: [{ role: "user", content: imageContent }],
     });
-
-    if (message.stop_reason === "max_tokens") {
-      console.error("Analysis response truncated (max_tokens)");
-      return res.status(500).json({ error: "AI response was too long. Please try again." });
-    }
-
-    var rawText = message.content[0].text;
+    var rawText = aiResult.content;
     var result;
     try {
       var stripped = rawText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();

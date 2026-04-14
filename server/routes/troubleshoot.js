@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
-import Anthropic from "@anthropic-ai/sdk";
 import auth from "../middleware/auth.js";
+import { callClaude } from "../utils/claudeClient.js";
 import { WIND_TROUBLESHOOT_SYSTEM_PROMPT } from "../prompts/troubleshoot.js";
 
 var router = Router();
@@ -11,8 +11,6 @@ var supabaseService = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY,
   { db: { schema: "windpal" } }
 );
-
-var anthropic = new Anthropic();
 
 router.post("/", auth, async function (req, res) {
   try {
@@ -57,19 +55,16 @@ router.post("/", auth, async function (req, res) {
 
     var messages = [{ role: "user", content: userMessage }];
 
-    var aiResponse = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 4096,
-      system: WIND_TROUBLESHOOT_SYSTEM_PROMPT,
+    var aiResult = await callClaude({
+      feature: 'troubleshoot',
+      context: {
+        conversationHistory: [],
+        symptom: symptom || '',
+      },
+      systemPrompt: WIND_TROUBLESHOOT_SYSTEM_PROMPT,
       messages: messages,
     });
-
-    if (aiResponse.stop_reason === "max_tokens") {
-      console.error("Troubleshoot response truncated (max_tokens)");
-      return res.status(500).json({ error: "AI response was too long. Please try a more specific symptom description." });
-    }
-
-    var rawText = aiResponse.content[0].text;
+    var rawText = aiResult.content;
     var result;
     try {
       var stripped = rawText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
