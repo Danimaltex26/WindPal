@@ -263,7 +263,8 @@ export default function TroubleshootPage() {
       <div className="page">
         <div className="stack">
           <div className="page-header">
-            <h2 style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>Diagnosis {model && <span style={{ fontSize: '0.6875rem', fontWeight: 400, color: '#6B6B73' }}>{model}</span>}</h2>
+            <h2>Diagnosis</h2>
+            {model && <div style={{ fontSize: '0.6875rem', color: '#6B6B73', marginTop: '0.25rem' }}>{model}</div>}
           </div>
 
           {messages.map(function (msg, i) {

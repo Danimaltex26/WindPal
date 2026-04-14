@@ -113,7 +113,7 @@ export default function ReferencePage() {
             </div>
           )}
 
-          {results && model && <div style={{ fontSize: '0.6875rem', color: '#6B6B73', marginBottom: '-0.5rem' }}>{model}</div>}
+          {results && model && <div style={{ fontSize: '0.6875rem', color: '#6B6B73', marginTop: '0.25rem' }}>{model}</div>}
 
           {results && (Array.isArray(results) ? results : [results]).map(function (r, i) {
             var content = r.content_json || {};
