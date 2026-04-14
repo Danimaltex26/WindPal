@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { apiUpload } from '../utils/api';
+import { compressImage } from '../utils/compressImage';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 var AI_MESSAGES = [
@@ -53,7 +54,8 @@ export default function InspectPage() {
 
     var formData = new FormData();
     for (var i = 0; i < Math.min(files.length, 4); i++) {
-      formData.append('images', files[i]);
+      var compressed = await compressImage(files[i]);
+      formData.append('images', compressed);
     }
     if (componentType) formData.append('component_type', componentType);
 
