@@ -2,6 +2,8 @@ import { useState, useRef } from 'react';
 import { apiUpload } from '../utils/api';
 import { compressImage } from '../utils/compressImage';
 import LoadingSpinner from '../components/LoadingSpinner';
+import OfflineQueue from '../components/OfflineQueue';
+import useOfflineQueue from '../hooks/useOfflineQueue';
 
 var AI_MESSAGES = [
   'Analyzing your turbine photo...',
@@ -42,7 +44,9 @@ export default function InspectPage() {
   const [result, setResult] = useState(null);
   const [model, setModel] = useState('');
   const [error, setError] = useState('');
+  const [queued, setQueued] = useState(false);
   var fileInputRef = useRef(null);
+  const offlineQueue = useOfflineQueue();
 
   async function handleUpload(e) {
     var files = e.target.files;
@@ -50,6 +54,17 @@ export default function InspectPage() {
 
     setError('');
     setResult(null);
+    setQueued(false);
+
+    // If offline, queue it
+    if (!navigator.onLine) {
+      await offlineQueue.enqueue(files, componentType);
+      setQueued(true);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // Online — upload directly
     setLoading(true);
 
     var formData = new FormData();
@@ -64,7 +79,13 @@ export default function InspectPage() {
       setResult(data.result);
       setModel(data.model || '');
     } catch (err) {
-      setError(err.message || 'Failed to analyze. Please try again.');
+      // If upload fails (network dropped mid-request), queue it
+      if (!navigator.onLine || err.message?.includes('fetch') || err.message?.includes('network')) {
+        await offlineQueue.enqueue(files, componentType);
+        setQueued(true);
+      } else {
+        setError(err.message || 'Failed to analyze. Please try again.');
+      }
     } finally {
       setLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -75,7 +96,15 @@ export default function InspectPage() {
     setResult(null);
     setModel('');
     setError('');
+    setQueued(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function handleViewQueueResult(item) {
+    if (item.result) {
+      setResult(item.result);
+      offlineQueue.dismiss(item.id);
+    }
   }
 
   if (loading) {
@@ -202,6 +231,20 @@ export default function InspectPage() {
           </p>
         </div>
 
+        {/* Offline indicator */}
+        {!navigator.onLine && (
+          <div className="warning-box" style={{ fontSize: '0.875rem' }}>
+            You are offline. Photos will be queued and processed automatically when you reconnect.
+          </div>
+        )}
+
+        {/* Queued confirmation */}
+        {queued && (
+          <div className="info-box" style={{ fontSize: '0.875rem' }}>
+            Photo queued! It will be processed automatically when you're back online.
+          </div>
+        )}
+
         {error && <div className="error-banner">{error}</div>}
 
         {/* Component Type */}
@@ -266,6 +309,16 @@ export default function InspectPage() {
             style={{ display: 'none' }}
           />
         </label>
+
+        {/* Offline Queue */}
+        <OfflineQueue
+          queue={offlineQueue.queue}
+          processing={offlineQueue.processing}
+          onRetry={offlineQueue.retry}
+          onDismiss={offlineQueue.dismiss}
+          onViewResult={handleViewQueueResult}
+          onClearCompleted={offlineQueue.clearCompleted}
+        />
       </div>
     </div>
   );
