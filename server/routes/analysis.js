@@ -128,13 +128,15 @@ router.post("/", auth, upload.array("images", 4), async function (req, res) {
       return res.json({ result: result, saved: false, save_error: insertResult.error.message, model: aiResult.model });
     }
 
-    // Send email notification (fire-and-forget, don't block response)
-    sendAnalysisReadyEmail({
-      to: req.user.email,
-      appKey: "windpal",
-      displayName: req.profile.display_name,
-      analysisType: result.analysis_type || analysis_type || "general",
-    }).catch(function () {});
+    // Only send email for offline-queued analyses
+    if (req.body.queued) {
+      sendAnalysisReadyEmail({
+        to: req.user.email,
+        appKey: "windpal",
+        displayName: req.profile.display_name,
+        analysisType: result.analysis_type || analysis_type || "general",
+      }).catch(function () {});
+    }
 
     return res.json({ result: result, record_id: insertResult.data.id, model: aiResult.model });
   } catch (err) {
