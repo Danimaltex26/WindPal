@@ -85,6 +85,7 @@ export default function TroubleshootPage() {
   const [messages, setMessages] = useState([]);
   const [model, setModel] = useState('');
   const [followUp, setFollowUp] = useState('');
+  const [sessionId, setSessionId] = useState(null);
 
   function set(field, value) {
     setForm(function (prev) {
@@ -102,10 +103,12 @@ export default function TroubleshootPage() {
     setError('');
     setLoading(true);
     setMessages([]);
+    setSessionId(null);
     try {
       var data = await apiPost('/troubleshoot', form);
       var result = data.result || data;
       setModel(data.model || '');
+      setSessionId(data.session_id || null);
       setMessages([
         { role: 'user', content: form.symptoms },
         { role: 'assistant', data: result },
@@ -118,7 +121,7 @@ export default function TroubleshootPage() {
   }
 
   async function handleFollowUp() {
-    if (!followUp.trim()) return;
+    if (!followUp.trim() || !sessionId) return;
     var userMsg = followUp;
     setFollowUp('');
     setError('');
@@ -126,12 +129,11 @@ export default function TroubleshootPage() {
     var newMessages = messages.concat([{ role: 'user', content: userMsg }]);
     setMessages(newMessages);
     try {
-      var data = await apiPost('/troubleshoot/followup', {
-        conversation: newMessages,
-        message: userMsg,
-        turbine_model: form.turbine_model,
-        component: form.component,
-        environment: form.environment,
+      // Backend handles follow-ups via the main /troubleshoot route
+      // using session_id + follow_up in the body.
+      var data = await apiPost('/troubleshoot', {
+        session_id: sessionId,
+        follow_up: userMsg,
       });
       var result = data.result || data;
       setModel(data.model || '');
@@ -148,6 +150,7 @@ export default function TroubleshootPage() {
     setModel('');
     setError('');
     setFollowUp('');
+    setSessionId(null);
     setForm({
       turbine_model: '',
       component: '',
@@ -489,7 +492,7 @@ export default function TroubleshootPage() {
                 onChange={function (e) { setFollowUp(e.target.value); }}
                 onKeyDown={function (e) { if (e.key === 'Enter') handleFollowUp(); }}
               />
-              <button className="btn btn-primary" onClick={handleFollowUp} disabled={loading}>
+              <button className="btn btn-primary" onClick={handleFollowUp} disabled={loading || !sessionId || !followUp.trim()}>
                 Send
               </button>
             </div>

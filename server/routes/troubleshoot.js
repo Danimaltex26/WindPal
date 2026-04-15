@@ -21,9 +21,11 @@ router.post("/", auth, async function (req, res) {
     var symptom = req.body.symptom || req.body.symptoms || req.body.symptomDescription;
     var environment = req.body.environment;
     var already_tried = req.body.already_tried || [];
+    var follow_up = req.body.follow_up;
+    var session_id = req.body.session_id;
 
-    // SUBSCRIPTION GATE
-    if (req.profile.subscription_tier === "free") {
+    // SUBSCRIPTION GATE — only counts NEW sessions; follow-ups are free
+    if (!session_id && req.profile.subscription_tier === "free") {
       var startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
       var countRes = await supabaseService
         .from("troubleshoot_sessions")
@@ -40,13 +42,34 @@ router.post("/", auth, async function (req, res) {
       }
     }
 
-    if (!symptom || typeof symptom !== "string" || !symptom.trim()) {
+    // Load existing session for follow-up
+    var existingSession = null;
+    var existingHistory = [];
+    if (session_id) {
+      var sessionRes = await supabaseService
+        .from("troubleshoot_sessions")
+        .select("*")
+        .eq("id", session_id)
+        .eq("user_id", userId)
+        .single();
+      if (sessionRes.error || !sessionRes.data) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      existingSession = sessionRes.data;
+      existingHistory = existingSession.conversation_json || [];
+    }
+
+    if (!session_id && (!symptom || typeof symptom !== "string" || !symptom.trim())) {
       return res.status(400).json({ error: "A symptom description is required" });
     }
 
-    var userMessage = buildTroubleshootMessage(req.body, { turbine_model, component, symptom, environment, already_tried });
+    var userMessage = session_id && follow_up
+      ? follow_up + "\n\nRespond with a JSON object exactly matching the schema in your instructions. No prose before or after, no markdown code fences."
+      : buildTroubleshootMessage(req.body, { turbine_model, component, symptom, environment, already_tried });
 
-    var messages = [{ role: "user", content: userMessage }];
+    var messages = existingHistory.length > 0
+      ? existingHistory.concat([{ role: "user", content: userMessage }])
+      : [{ role: "user", content: userMessage }];
 
     // CLAUDE API CALL: WindPal troubleshoot diagnosis
     // Wind turbine troubleshoot always routes to Sonnet — all signals
@@ -54,7 +77,7 @@ router.post("/", auth, async function (req, res) {
     // See utils/modelRouter.js classifyTroubleshoot()
     var troubleshootContext = {
       // Prior conversation turns — multi-turn escalates to Sonnet
-      conversationHistory: req.body.conversationHistory || [],
+      conversationHistory: existingHistory,
 
       // Symptom for safety keyword detection
       symptom: symptom || req.body.scadaAlarmCodes || req.body.scada_alarm_codes || '',
@@ -119,30 +142,44 @@ router.post("/", auth, async function (req, res) {
       return res.status(500).json({ error: "Failed to parse troubleshoot result", raw: rawText });
     }
 
-    var conversationRecord = [
-      { role: "user", content: userMessage },
-      { role: "assistant", content: rawText },
-    ];
+    var updatedHistory = messages.concat([{ role: "assistant", content: rawText }]);
 
-    var insertResult = await supabaseService
-      .from("troubleshoot_sessions")
-      .insert({
-        user_id: userId,
-        turbine_model: turbine_model,
-        component: component,
-        environment: environment,
-        conversation_json: conversationRecord,
-        resolved: false,
-      })
-      .select()
-      .single();
+    var sessionPayload = {
+      user_id: userId,
+      turbine_model: turbine_model || (existingSession && existingSession.turbine_model),
+      component: component || (existingSession && existingSession.component),
+      environment: environment || (existingSession && existingSession.environment),
+      conversation_json: updatedHistory,
+      resolved: (existingSession && existingSession.resolved) || false,
+    };
 
-    if (insertResult.error) {
-      console.error("Save error:", insertResult.error);
-      return res.json({ result: result, saved: false, model: aiResult.model });
+    var savedSession;
+    if (session_id && existingSession) {
+      var updateRes = await supabaseService
+        .from("troubleshoot_sessions")
+        .update(sessionPayload)
+        .eq("id", session_id)
+        .select()
+        .single();
+      if (updateRes.error) {
+        console.error("Session update error:", updateRes.error);
+        return res.json({ result: result, session_id: session_id, saved: false, model: aiResult.model });
+      }
+      savedSession = updateRes.data;
+    } else {
+      var insertRes = await supabaseService
+        .from("troubleshoot_sessions")
+        .insert(sessionPayload)
+        .select()
+        .single();
+      if (insertRes.error) {
+        console.error("Session insert error:", insertRes.error);
+        return res.json({ result: result, saved: false, model: aiResult.model });
+      }
+      savedSession = insertRes.data;
     }
 
-    return res.json({ result: result, session_id: insertResult.data.id, model: aiResult.model });
+    return res.json({ result: result, session_id: savedSession.id, model: aiResult.model });
   } catch (err) {
     console.error("Troubleshoot error:", err);
     return res.status(500).json({ error: "Internal server error" });
