@@ -116,6 +116,46 @@ export default function InspectPage() {
   }
 
   if (result) {
+    var imageUsable = result.is_wind_turbine_image !== false && result.image_quality?.usable !== false;
+    var ctx = result.turbine_context;
+    var blade = result.blade_analysis;
+    var nacelle = result.nacelle_analysis;
+    var gearbox = result.gearbox_analysis;
+    var generator = result.generator_analysis;
+    var tower = result.tower_analysis;
+    var electrical = result.electrical_analysis;
+    var pitchYaw = result.pitch_yaw_analysis;
+    var faultDisplay = result.fault_display_analysis;
+
+    function assessmentBadgeClass(a) {
+      if (!a) return 'badge badge-gray';
+      var s = a.toLowerCase();
+      if (s.indexOf('immediate_shutdown') >= 0) return 'badge badge-red';
+      if (s.indexOf('shutdown') >= 0) return 'badge badge-red';
+      if (s.indexOf('schedule') >= 0) return 'badge badge-amber';
+      if (s.indexOf('monitor') >= 0) return 'badge badge-amber';
+      if (s.indexOf('safe') >= 0) return 'badge badge-green';
+      return 'badge badge-gray';
+    }
+
+    function urgencyBadgeClass(u) {
+      if (!u) return 'badge badge-gray';
+      var s = u.toLowerCase();
+      if (s === 'immediate' || s === 'immediate_shutdown' || s === 'before_climb') return 'badge badge-red';
+      if (s === 'before_restart' || s === 'today' || s === 'next_scheduled_maintenance') return 'badge badge-amber';
+      if (s === 'this_week') return 'badge badge-amber';
+      if (s === 'next_pm' || s === 'routine' || s === 'monitor' || s === 'informational') return 'badge badge-green';
+      return 'badge badge-gray';
+    }
+
+    function confidenceBadgeClass(c) {
+      if (!c) return 'badge badge-gray';
+      var s = c.toLowerCase();
+      if (s.indexOf('high') >= 0) return 'badge badge-green';
+      if (s.indexOf('medium') >= 0) return 'badge badge-amber';
+      return 'badge badge-red';
+    }
+
     return (
       <div className="page">
         <div className="stack">
@@ -124,72 +164,607 @@ export default function InspectPage() {
             {model && <div style={{ fontSize: '0.6875rem', color: '#6B6B73', marginTop: '0.25rem' }}>{model}</div>}
           </div>
 
-          {result.plain_english_summary && (
-            <div className="card">
-              <p style={{ fontSize: '1.125rem', lineHeight: 1.6 }}>{result.plain_english_summary}</p>
+          {/* Unusable image warning */}
+          {!imageUsable && (
+            <div className="warning-box">
+              <strong>Image could not be analyzed.</strong>
+              {result.image_quality?.quality_note && (
+                <p style={{ marginTop: '0.25rem' }}>{result.image_quality.quality_note}</p>
+              )}
             </div>
           )}
 
-          {result.diagnosis && (
-            <div className="card">
-              <h3 style={{ marginBottom: '0.5rem' }}>Diagnosis</h3>
-              <p className="text-secondary">{result.diagnosis}</p>
+          {/* Overall Assessment Badge */}
+          {imageUsable && result.overall_assessment && (
+            <div className="card" style={{ textAlign: 'center' }}>
+              <span className={assessmentBadgeClass(result.overall_assessment)} style={{ fontSize: '1.25rem', padding: '0.5rem 1.5rem' }}>
+                {result.overall_assessment.replace(/_/g, ' ').toUpperCase()}
+              </span>
             </div>
           )}
 
-          {result.severity && (
+          {/* Assessment Reasoning */}
+          {result.assessment_reasoning && (
             <div className="card">
-              <div className="row-between">
-                <strong>Severity</strong>
-                <span className={severityBadge(result.severity)}>{result.severity}</span>
+              <p style={{ fontSize: '1.0625rem', lineHeight: 1.6 }}>{result.assessment_reasoning}</p>
+            </div>
+          )}
+
+          {/* Immediate Safety Hazards */}
+          {result.immediate_safety_hazards && result.immediate_safety_hazards.length > 0 && (
+            <div className="card" style={{ borderLeft: '3px solid #22D3EE' }}>
+              <h3 style={{ marginBottom: '0.75rem' }}>Immediate Safety Hazards</h3>
+              <div className="stack-sm">
+                {result.immediate_safety_hazards.map(function (h, i) {
+                  return (
+                    <div key={i} className="warning-box">
+                      <div className="row-between" style={{ marginBottom: '0.25rem' }}>
+                        <strong>{h.hazard_type ? h.hazard_type.replace(/_/g, ' ') : 'Hazard'}</strong>
+                        {h.severity && <span className={severityBadge(h.severity)}>{h.severity}</span>}
+                      </div>
+                      {h.description && <p style={{ marginTop: '0.25rem' }}>{h.description}</p>}
+                      {h.immediate_action && (
+                        <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                          <span className="text-secondary">Action:</span> {h.immediate_action}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {result.recommended_action && (
+          {/* Detected Context */}
+          {ctx && (ctx.turbine_manufacturer_detected || ctx.turbine_platform_detected || ctx.turbine_class_detected || ctx.approximate_capacity_mw || ctx.component_location) && (
             <div className="card">
-              <div className="row-between" style={{ marginBottom: '0.5rem' }}>
-                <strong>Recommended Action</strong>
-                <span className={actionBadge(result.recommended_action)}>
-                  {result.recommended_action.replace(/_/g, ' ')}
-                </span>
+              <h3 style={{ marginBottom: '0.75rem' }}>Detected</h3>
+              <div className="stack-sm">
+                {ctx.turbine_manufacturer_detected && ctx.turbine_manufacturer_detected !== 'Unknown' && ctx.turbine_manufacturer_detected !== 'Other' && (
+                  <div className="row-between">
+                    <span className="text-secondary">Manufacturer</span>
+                    <span className="badge badge-blue">{ctx.turbine_manufacturer_detected}</span>
+                  </div>
+                )}
+                {ctx.turbine_platform_detected && (
+                  <div className="row-between">
+                    <span className="text-secondary">Platform</span>
+                    <span style={{ fontWeight: 600 }}>{ctx.turbine_platform_detected}</span>
+                  </div>
+                )}
+                {ctx.turbine_class_detected && ctx.turbine_class_detected !== 'unknown' && (
+                  <div className="row-between">
+                    <span className="text-secondary">Class</span>
+                    <span style={{ fontWeight: 600 }}>{ctx.turbine_class_detected}</span>
+                  </div>
+                )}
+                {ctx.approximate_capacity_mw && (
+                  <div className="row-between">
+                    <span className="text-secondary">Capacity</span>
+                    <span style={{ fontWeight: 600 }}>{ctx.approximate_capacity_mw}</span>
+                  </div>
+                )}
+                {ctx.component_location && (
+                  <div className="row-between">
+                    <span className="text-secondary">Location</span>
+                    <span style={{ fontWeight: 600 }}>{ctx.component_location}</span>
+                  </div>
+                )}
               </div>
-              {result.confidence && (
-                <div className="row" style={{ marginTop: '0.5rem' }}>
-                  <span className="text-secondary" style={{ fontSize: '0.875rem' }}>Confidence:</span>
-                  <span className={'badge ' + (result.confidence === 'high' ? 'badge-green' : result.confidence === 'medium' ? 'badge-amber' : 'badge-red')}>
-                    {result.confidence}
-                  </span>
+            </div>
+          )}
+
+          {/* Blade Analysis */}
+          {blade?.applicable && (
+            <div className="card">
+              <h3 style={{ marginBottom: '0.75rem' }}>Blade Analysis</h3>
+              <div className="stack-sm">
+                {blade.blade_position && blade.blade_position !== 'unknown' && (
+                  <div className="row-between">
+                    <span className="text-secondary">Position</span>
+                    <span style={{ fontWeight: 600 }}>{blade.blade_position.replace(/_/g, ' ')}</span>
+                  </div>
+                )}
+                {blade.surface_condition && (
+                  <div className="row-between">
+                    <span className="text-secondary">Surface Condition</span>
+                    <span className={severityBadge(blade.surface_condition)}>{blade.surface_condition}</span>
+                  </div>
+                )}
+                {blade.repair_category && (
+                  <div className="row-between">
+                    <span className="text-secondary">Repair Category</span>
+                    <span>{blade.repair_category.replace(/_/g, ' ')}</span>
+                  </div>
+                )}
+                {blade.continue_operation_recommendation && (
+                  <div className="row-between">
+                    <span className="text-secondary">Continue Operation</span>
+                    <span className={assessmentBadgeClass(blade.continue_operation_recommendation)}>
+                      {blade.continue_operation_recommendation.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {blade.defects_found && blade.defects_found.length > 0 && (
+                <div style={{ marginTop: '1rem' }}>
+                  <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9375rem' }}>Defects Found</h4>
+                  <div className="stack-sm">
+                    {blade.defects_found.map(function (d, i) {
+                      return (
+                        <div key={i} style={{ padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+                          <div className="row-between" style={{ marginBottom: '0.25rem' }}>
+                            <strong>{d.defect_type ? d.defect_type.replace(/_/g, ' ') : 'Defect'}</strong>
+                            {d.severity && <span className={severityBadge(d.severity)}>{d.severity}</span>}
+                          </div>
+                          {d.location && <p className="text-secondary" style={{ fontSize: '0.8125rem' }}>Location: {d.location}</p>}
+                          {d.description && <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>{d.description}</p>}
+                          {d.probable_cause && (
+                            <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                              <span className="text-secondary">Cause:</span> {d.probable_cause}
+                            </p>
+                          )}
+                          {d.recommended_action && (
+                            <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                              <span className="text-secondary">Fix:</span> {d.recommended_action}
+                            </p>
+                          )}
+                          {d.urgency && (
+                            <div style={{ marginTop: '0.375rem' }}>
+                              <span className={urgencyBadgeClass(d.urgency)}>{d.urgency.replace(/_/g, ' ')}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {result.safety_warning && (
-            <div className="warning-box">{result.safety_warning}</div>
+          {/* Nacelle Analysis */}
+          {nacelle?.applicable && (
+            <div className="card">
+              <h3 style={{ marginBottom: '0.75rem' }}>Nacelle Analysis</h3>
+              {nacelle.nacelle_condition && (
+                <div className="row-between">
+                  <span className="text-secondary">Condition</span>
+                  <span className={severityBadge(nacelle.nacelle_condition)}>{nacelle.nacelle_condition}</span>
+                </div>
+              )}
+              {nacelle.issues_found && nacelle.issues_found.length > 0 && (
+                <div style={{ marginTop: '1rem' }}>
+                  <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9375rem' }}>Issues</h4>
+                  <div className="stack-sm">
+                    {nacelle.issues_found.map(function (iss, i) {
+                      return (
+                        <div key={i} style={{ padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+                          <div className="row-between" style={{ marginBottom: '0.25rem' }}>
+                            <strong>{iss.component || (iss.issue_type ? iss.issue_type.replace(/_/g, ' ') : 'Issue')}</strong>
+                            {iss.severity && <span className={severityBadge(iss.severity)}>{iss.severity}</span>}
+                          </div>
+                          {iss.issue_type && iss.component && (
+                            <p className="text-secondary" style={{ fontSize: '0.8125rem' }}>{iss.issue_type.replace(/_/g, ' ')}</p>
+                          )}
+                          {iss.description && <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>{iss.description}</p>}
+                          {iss.corrective_action && (
+                            <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                              <span className="text-secondary">Fix:</span> {iss.corrective_action}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
-          {result.findings && result.findings.length > 0 && (
+          {/* Gearbox Analysis */}
+          {gearbox?.applicable && (
             <div className="card">
-              <h3 style={{ marginBottom: '0.75rem' }}>Findings</h3>
+              <h3 style={{ marginBottom: '0.75rem' }}>Gearbox Analysis</h3>
               <div className="stack-sm">
-                {result.findings.map(function (f, i) {
+                {gearbox.oil_level_visible != null && (
+                  <div className="row-between">
+                    <span className="text-secondary">Oil Level Visible</span>
+                    <span>{gearbox.oil_level_visible ? 'Yes' : 'No'}</span>
+                  </div>
+                )}
+                {gearbox.oil_level_reading && (
+                  <div className="row-between">
+                    <span className="text-secondary">Oil Level Reading</span>
+                    <span style={{ fontWeight: 600 }}>{gearbox.oil_level_reading}</span>
+                  </div>
+                )}
+                {gearbox.oil_condition_visual && (
+                  <div className="row-between">
+                    <span className="text-secondary">Oil Condition</span>
+                    <span className={gearbox.oil_condition_visual === 'normal' ? 'badge badge-green' : 'badge badge-amber'}>
+                      {gearbox.oil_condition_visual.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                )}
+                {gearbox.leak_evidence != null && (
+                  <div className="row-between">
+                    <span className="text-secondary">Leak Evidence</span>
+                    <span>{gearbox.leak_evidence ? 'Yes' : 'No'}</span>
+                  </div>
+                )}
+                {gearbox.leak_location && (
+                  <div className="row-between">
+                    <span className="text-secondary">Leak Location</span>
+                    <span>{gearbox.leak_location}</span>
+                  </div>
+                )}
+                {gearbox.oil_sample_recommended === true && (
+                  <div className="warning-box" style={{ marginTop: '0.5rem' }}>
+                    <strong>Oil sample recommended.</strong>
+                  </div>
+                )}
+              </div>
+              {gearbox.issues_found && gearbox.issues_found.length > 0 && (
+                <div style={{ marginTop: '1rem' }}>
+                  <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9375rem' }}>Issues</h4>
+                  <div className="stack-sm">
+                    {gearbox.issues_found.map(function (iss, i) {
+                      return (
+                        <div key={i} style={{ padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+                          <div className="row-between" style={{ marginBottom: '0.25rem' }}>
+                            <strong>{iss.issue_type ? iss.issue_type.replace(/_/g, ' ') : 'Issue'}</strong>
+                            {iss.severity && <span className={severityBadge(iss.severity)}>{iss.severity}</span>}
+                          </div>
+                          {iss.description && <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>{iss.description}</p>}
+                          {iss.corrective_action && (
+                            <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                              <span className="text-secondary">Fix:</span> {iss.corrective_action}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Generator Analysis */}
+          {generator?.applicable && (
+            <div className="card">
+              <h3 style={{ marginBottom: '0.75rem' }}>Generator Analysis</h3>
+              <div className="stack-sm">
+                {generator.generator_type && generator.generator_type !== 'unknown' && (
+                  <div className="row-between">
+                    <span className="text-secondary">Generator Type</span>
+                    <span style={{ fontWeight: 600 }}>{generator.generator_type}</span>
+                  </div>
+                )}
+                {generator.thermal_evidence && (
+                  <div className="row-between">
+                    <span className="text-secondary">Thermal Evidence</span>
+                    <span>{generator.thermal_evidence}</span>
+                  </div>
+                )}
+              </div>
+              {generator.issues_found && generator.issues_found.length > 0 && (
+                <div style={{ marginTop: '1rem' }}>
+                  <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9375rem' }}>Issues</h4>
+                  <div className="stack-sm">
+                    {generator.issues_found.map(function (iss, i) {
+                      return (
+                        <div key={i} style={{ padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+                          <div className="row-between" style={{ marginBottom: '0.25rem' }}>
+                            <strong>{iss.issue_type ? iss.issue_type.replace(/_/g, ' ') : 'Issue'}</strong>
+                            {iss.severity && <span className={severityBadge(iss.severity)}>{iss.severity}</span>}
+                          </div>
+                          {iss.description && <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>{iss.description}</p>}
+                          {iss.corrective_action && (
+                            <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                              <span className="text-secondary">Fix:</span> {iss.corrective_action}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tower Analysis */}
+          {tower?.applicable && (
+            <div className="card">
+              <h3 style={{ marginBottom: '0.75rem' }}>Tower Analysis</h3>
+              <div className="stack-sm">
+                {tower.tower_section && tower.tower_section !== 'unknown' && (
+                  <div className="row-between">
+                    <span className="text-secondary">Tower Section</span>
+                    <span style={{ fontWeight: 600 }}>{tower.tower_section}</span>
+                  </div>
+                )}
+                {tower.corrosion_assessment && (
+                  <div className="row-between">
+                    <span className="text-secondary">Corrosion</span>
+                    <span className={tower.corrosion_assessment === 'none' ? 'badge badge-green' : tower.corrosion_assessment === 'surface' ? 'badge badge-amber' : 'badge badge-red'}>
+                      {tower.corrosion_assessment.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {tower.issues_found && tower.issues_found.length > 0 && (
+                <div style={{ marginTop: '1rem' }}>
+                  <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9375rem' }}>Issues</h4>
+                  <div className="stack-sm">
+                    {tower.issues_found.map(function (iss, i) {
+                      return (
+                        <div key={i} style={{ padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+                          <div className="row-between" style={{ marginBottom: '0.25rem' }}>
+                            <strong>{iss.issue_type ? iss.issue_type.replace(/_/g, ' ') : 'Issue'}</strong>
+                            {iss.severity && <span className={severityBadge(iss.severity)}>{iss.severity}</span>}
+                          </div>
+                          {iss.location && <p className="text-secondary" style={{ fontSize: '0.8125rem' }}>Location: {iss.location}</p>}
+                          {iss.description && <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>{iss.description}</p>}
+                          {iss.corrective_action && (
+                            <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                              <span className="text-secondary">Fix:</span> {iss.corrective_action}
+                            </p>
+                          )}
+                          {iss.bolt_torque_check_required === true && (
+                            <p style={{ fontSize: '0.8125rem', marginTop: '0.25rem', color: '#F59E0B' }}>
+                              Bolt torque check required
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Electrical Analysis */}
+          {electrical?.applicable && (
+            <div className="card">
+              <h3 style={{ marginBottom: '0.75rem' }}>Electrical Analysis</h3>
+              <div className="stack-sm">
+                {electrical.cabinet_type && electrical.cabinet_type !== 'unknown' && (
+                  <div className="row-between">
+                    <span className="text-secondary">Cabinet Type</span>
+                    <span style={{ fontWeight: 600 }}>{electrical.cabinet_type.replace(/_/g, ' ')}</span>
+                  </div>
+                )}
+                {electrical.fault_indicators_visible != null && (
+                  <div className="row-between">
+                    <span className="text-secondary">Fault Indicators</span>
+                    <span>{electrical.fault_indicators_visible ? 'Active' : 'None visible'}</span>
+                  </div>
+                )}
+              </div>
+              {electrical.issues_found && electrical.issues_found.length > 0 && (
+                <div style={{ marginTop: '1rem' }}>
+                  <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9375rem' }}>Issues</h4>
+                  <div className="stack-sm">
+                    {electrical.issues_found.map(function (iss, i) {
+                      return (
+                        <div key={i} style={{ padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+                          <div className="row-between" style={{ marginBottom: '0.25rem' }}>
+                            <strong>{iss.issue_type ? iss.issue_type.replace(/_/g, ' ') : 'Issue'}</strong>
+                            {iss.severity && <span className={severityBadge(iss.severity)}>{iss.severity}</span>}
+                          </div>
+                          {iss.description && <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>{iss.description}</p>}
+                          {iss.corrective_action && (
+                            <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                              <span className="text-secondary">Fix:</span> {iss.corrective_action}
+                            </p>
+                          )}
+                          {iss.de_energize_required === true && (
+                            <p style={{ fontSize: '0.8125rem', marginTop: '0.25rem', color: '#EF4444' }}>
+                              De-energize required before inspection
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Pitch / Yaw Analysis */}
+          {pitchYaw?.applicable && (
+            <div className="card">
+              <h3 style={{ marginBottom: '0.75rem' }}>Pitch / Yaw Analysis</h3>
+              <div className="stack-sm">
+                {pitchYaw.system_type && (
+                  <div className="row-between">
+                    <span className="text-secondary">System Type</span>
+                    <span style={{ fontWeight: 600 }}>{pitchYaw.system_type}</span>
+                  </div>
+                )}
+                {pitchYaw.grease_condition_visible && (
+                  <div className="row-between">
+                    <span className="text-secondary">Grease Condition</span>
+                    <span>{pitchYaw.grease_condition_visible}</span>
+                  </div>
+                )}
+                {pitchYaw.lubrication_required === true && (
+                  <div className="warning-box" style={{ marginTop: '0.5rem' }}>
+                    Lubrication required.
+                  </div>
+                )}
+              </div>
+              {pitchYaw.issues_found && pitchYaw.issues_found.length > 0 && (
+                <div style={{ marginTop: '1rem' }}>
+                  <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9375rem' }}>Issues</h4>
+                  <div className="stack-sm">
+                    {pitchYaw.issues_found.map(function (iss, i) {
+                      return (
+                        <div key={i} style={{ padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+                          <div className="row-between" style={{ marginBottom: '0.25rem' }}>
+                            <strong>{iss.component ? iss.component.replace(/_/g, ' ') : 'Component'}</strong>
+                            {iss.severity && <span className={severityBadge(iss.severity)}>{iss.severity}</span>}
+                          </div>
+                          {iss.issue_type && (
+                            <p className="text-secondary" style={{ fontSize: '0.8125rem' }}>{iss.issue_type.replace(/_/g, ' ')}</p>
+                          )}
+                          {iss.description && <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>{iss.description}</p>}
+                          {iss.corrective_action && (
+                            <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                              <span className="text-secondary">Fix:</span> {iss.corrective_action}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Fault Display Analysis */}
+          {faultDisplay?.applicable && (
+            <div className="card">
+              <h3 style={{ marginBottom: '0.75rem' }}>Fault Display</h3>
+              <div className="stack-sm">
+                {faultDisplay.display_type && faultDisplay.display_type !== 'unknown' && (
+                  <div className="row-between">
+                    <span className="text-secondary">Display Type</span>
+                    <span style={{ fontWeight: 600 }}>{faultDisplay.display_type}</span>
+                  </div>
+                )}
+                {faultDisplay.manufacturer_platform && (
+                  <div className="row-between">
+                    <span className="text-secondary">Platform</span>
+                    <span style={{ fontWeight: 600 }}>{faultDisplay.manufacturer_platform}</span>
+                  </div>
+                )}
+                {faultDisplay.alarm_count != null && (
+                  <div className="row-between">
+                    <span className="text-secondary">Alarm Count</span>
+                    <span style={{ fontWeight: 600 }}>{faultDisplay.alarm_count}</span>
+                  </div>
+                )}
+                {faultDisplay.turbine_status_visible && (
+                  <div className="row-between">
+                    <span className="text-secondary">Turbine Status</span>
+                    <span>{faultDisplay.turbine_status_visible}</span>
+                  </div>
+                )}
+                {faultDisplay.power_output_visible && (
+                  <div className="row-between">
+                    <span className="text-secondary">Power Output</span>
+                    <span>{faultDisplay.power_output_visible}</span>
+                  </div>
+                )}
+                {faultDisplay.wind_speed_visible && (
+                  <div className="row-between">
+                    <span className="text-secondary">Wind Speed</span>
+                    <span>{faultDisplay.wind_speed_visible}</span>
+                  </div>
+                )}
+                {faultDisplay.other_readings_visible && (
+                  <div className="row-between">
+                    <span className="text-secondary">Other Readings</span>
+                    <span>{faultDisplay.other_readings_visible}</span>
+                  </div>
+                )}
+              </div>
+
+              {faultDisplay.active_faults && faultDisplay.active_faults.length > 0 && (
+                <div style={{ marginTop: '1rem' }}>
+                  <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9375rem' }}>Active Faults</h4>
+                  <div className="stack-sm">
+                    {faultDisplay.active_faults.map(function (f, i) {
+                      return (
+                        <div key={i} style={{ padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+                          <div className="row-between" style={{ marginBottom: '0.25rem' }}>
+                            <strong>{f.fault_code || 'Fault'}</strong>
+                            {f.urgency && <span className={urgencyBadgeClass(f.urgency)}>{f.urgency.replace(/_/g, ' ')}</span>}
+                          </div>
+                          {f.fault_description && <p style={{ fontSize: '0.875rem' }}>{f.fault_description}</p>}
+                          {f.fault_category && (
+                            <p className="text-secondary" style={{ fontSize: '0.8125rem', marginTop: '0.25rem' }}>
+                              Category: {f.fault_category}
+                            </p>
+                          )}
+                          {f.probable_causes && f.probable_causes.length > 0 && (
+                            <div style={{ marginTop: '0.25rem' }}>
+                              <span className="text-secondary" style={{ fontSize: '0.8125rem' }}>Probable causes:</span>
+                              <ul style={{ margin: '0.25rem 0 0 1.25rem', fontSize: '0.875rem' }}>
+                                {f.probable_causes.map(function (pc, j) {
+                                  return <li key={j}>{pc}</li>;
+                                })}
+                              </ul>
+                            </div>
+                          )}
+                          {f.reset_procedure && (
+                            <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                              <span className="text-secondary">Reset:</span> {f.reset_procedure}
+                            </p>
+                          )}
+                          {f.requires_physical_inspection === true && (
+                            <p style={{ fontSize: '0.8125rem', marginTop: '0.25rem', color: '#F59E0B' }}>
+                              Physical inspection required
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Prioritized Actions */}
+          {result.prioritized_actions && result.prioritized_actions.length > 0 && (
+            <div className="card">
+              <h3 style={{ marginBottom: '0.75rem' }}>Prioritized Actions</h3>
+              <ol style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                {result.prioritized_actions.map(function (a, i) {
                   return (
-                    <div key={i} style={{ paddingBottom: '0.75rem', borderBottom: '1px solid #2A2A2E' }}>
-                      <div className="row-between" style={{ marginBottom: '0.25rem' }}>
-                        <strong>{f.issue}</strong>
-                        <span className={severityBadge(f.severity)}>{f.severity}</span>
+                    <li key={i} style={{ marginBottom: '0.75rem' }}>
+                      <div className="row" style={{ gap: '0.5rem', alignItems: 'center', marginBottom: '0.25rem' }}>
+                        {a.urgency && (
+                          <span className={urgencyBadgeClass(a.urgency)} style={{ fontSize: '0.6875rem' }}>
+                            {a.urgency.replace(/_/g, ' ')}
+                          </span>
+                        )}
                       </div>
-                      <p className="text-secondary" style={{ fontSize: '0.875rem' }}>{f.description}</p>
-                      {f.probable_cause && (
-                        <p style={{ fontSize: '0.8125rem', marginTop: '0.25rem' }}>
-                          <span className="text-secondary">Cause:</span> {f.probable_cause}
-                        </p>
+                      {a.action && <p style={{ fontSize: '0.9375rem' }}>{a.action}</p>}
+                      {a.reason && (
+                        <p className="text-secondary" style={{ fontSize: '0.8125rem', marginTop: '0.125rem' }}>{a.reason}</p>
                       )}
-                      {f.immediate_action && (
-                        <p style={{ fontSize: '0.8125rem', marginTop: '0.25rem' }}>
-                          <span className="text-secondary">Action:</span> {f.immediate_action}
-                        </p>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          )}
+
+          {/* Standards References */}
+          {result.standards_references && result.standards_references.length > 0 && (
+            <div className="card">
+              <h3 style={{ marginBottom: '0.75rem' }}>Standards</h3>
+              <div className="stack-sm">
+                {result.standards_references.map(function (s, i) {
+                  return (
+                    <div key={i} style={{ fontSize: '0.875rem' }}>
+                      <strong>{s.standard}</strong>
+                      {s.section && <span className="text-secondary"> · {s.section}</span>}
+                      {s.requirement_summary && (
+                        <p className="text-secondary" style={{ marginTop: '0.125rem' }}>{s.requirement_summary}</p>
+                      )}
+                      {s.applies_to && (
+                        <p className="text-muted" style={{ fontSize: '0.75rem' }}>Applies to: {s.applies_to}</p>
                       )}
                     </div>
                   );
@@ -198,19 +773,34 @@ export default function InspectPage() {
             </div>
           )}
 
-          {result.recommendations && result.recommendations.length > 0 && (
+          {/* Recommended Next Steps */}
+          {result.recommended_next_steps && (
             <div className="card">
-              <h3 style={{ marginBottom: '0.75rem' }}>Recommendations</h3>
-              <div className="stack-sm">
-                {result.recommendations.map(function (r, i) {
-                  return (
-                    <div key={i} style={{ padding: '0.5rem 0', borderBottom: '1px solid #2A2A2E' }}>
-                      <p>{r}</p>
-                    </div>
-                  );
-                })}
-              </div>
+              <h3 style={{ marginBottom: '0.5rem' }}>Next Steps</h3>
+              <p>{result.recommended_next_steps}</p>
             </div>
+          )}
+
+          {/* Confidence */}
+          {result.confidence && (
+            <div className="card">
+              <div className="row-between">
+                <span className="text-secondary">Confidence</span>
+                <span className={confidenceBadgeClass(result.confidence)}>{result.confidence}</span>
+              </div>
+              {result.confidence_reasoning && (
+                <p className="text-secondary" style={{ fontSize: '0.8125rem', marginTop: '0.5rem' }}>
+                  {result.confidence_reasoning}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Scope Disclaimer */}
+          {result.scope_disclaimer && (
+            <p className="text-muted" style={{ fontSize: '0.75rem', fontStyle: 'italic', padding: '0 0.5rem' }}>
+              {result.scope_disclaimer}
+            </p>
           )}
 
           <button className="btn btn-secondary btn-block" onClick={handleReset}>
