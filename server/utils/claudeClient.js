@@ -2,15 +2,26 @@
  * TradePals Claude Client
  *
  * Single entry point for all Claude API calls.
- * Handles model selection via modelRouter, retries, and error formatting.
+ * Handles model selection via modelRouter, retries, error formatting,
+ * and usage logging to Supabase for cost tracking.
  *
  * Never call Anthropic directly from route handlers — use this client.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { createClient } from '@supabase/supabase-js';
 import { getModelConfig, MODELS } from './modelRouter.js';
 
 const anthropic = new Anthropic();
+
+// Supabase client for usage logging (public schema, service role)
+var supabaseLog = null;
+if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  supabaseLog = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+// App name — set via APP_NAME env var, or derived from service name in health check
+var APP_NAME = process.env.APP_NAME || 'unknown';
 
 /**
  * @param {object} options
@@ -19,10 +30,11 @@ const anthropic = new Anthropic();
  * @param {string} options.systemPrompt - System prompt
  * @param {Array}  options.messages - [{role, content}]
  * @param {number} options.maxTokensOverride - Override default max_tokens
+ * @param {string} options.userId - Optional user ID for usage tracking
  * @returns {Promise<{content: string, model: string, usage: object, feature: string}>}
  */
 export async function callClaude(options) {
-  var { feature, context, systemPrompt, messages, maxTokensOverride } = options;
+  var { feature, context, systemPrompt, messages, maxTokensOverride, userId } = options;
   if (!context) context = {};
 
   var config = getModelConfig(feature, context);
@@ -42,7 +54,7 @@ export async function callClaude(options) {
         messages: messages,
       });
 
-      logUsage(feature, config.model, response.usage);
+      logUsage(feature, config.model, response.usage, userId);
 
       return {
         content: response.content[0].text,
@@ -69,22 +81,39 @@ export async function callClaude(options) {
   }
 }
 
-function logUsage(feature, model, usage) {
-  var shouldLog = process.env.NODE_ENV === 'development' ||
-                  process.env.TRADEPAL_MODEL_LOGGING === 'true';
-  if (!shouldLog) return;
-
+function logUsage(feature, model, usage, userId) {
   var isSonnet = model.includes('sonnet');
   var label = isSonnet ? 'SONNET' : 'HAIKU';
   var inputCost = (usage.input_tokens / 1000000) * (isSonnet ? 3.0 : 0.25);
   var outputCost = (usage.output_tokens / 1000000) * (isSonnet ? 15.0 : 1.25);
   var total = inputCost + outputCost;
 
-  console.log(
-    '[ClaudeClient] ' + feature + ' | ' + label +
-    ' | in:' + usage.input_tokens + ' out:' + usage.output_tokens +
-    ' | ~$' + total.toFixed(5)
-  );
+  // Console log in dev
+  var shouldLog = process.env.NODE_ENV === 'development' ||
+                  process.env.TRADEPAL_MODEL_LOGGING === 'true';
+  if (shouldLog) {
+    console.log(
+      '[ClaudeClient] ' + feature + ' | ' + label +
+      ' | in:' + usage.input_tokens + ' out:' + usage.output_tokens +
+      ' | ~$' + total.toFixed(5)
+    );
+  }
+
+  // Write to Supabase usage log (fire-and-forget)
+  if (supabaseLog) {
+    supabaseLog.from('ai_usage_log').insert({
+      app_name: APP_NAME,
+      feature: feature,
+      model: model,
+      is_sonnet: isSonnet,
+      input_tokens: usage.input_tokens,
+      output_tokens: usage.output_tokens,
+      estimated_cost_usd: total,
+      user_id: userId || null,
+    }).then(function (res) {
+      if (res.error) console.error('[ClaudeClient] Usage log error:', res.error.message);
+    }).catch(function () {});
+  }
 }
 
 function formatClaudeError(error, feature, model) {
