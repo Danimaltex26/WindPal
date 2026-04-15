@@ -23,7 +23,7 @@ async function generateContent(certLevel, moduleTitle, topicList) {
   while (retries < 3) {
     try {
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
+        model: "claude-sonnet-4-20250514",
         max_tokens: 8192,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: userPrompt }],

@@ -10,7 +10,7 @@
  */
 
 export const MODELS = {
-  SONNET: 'claude-sonnet-4-6',
+  SONNET: 'claude-sonnet-4-20250514',
   HAIKU: 'claude-haiku-4-5-20251001',
 };
 
