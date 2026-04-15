@@ -17,7 +17,8 @@ router.post("/", auth, async function (req, res) {
     var userId = req.user.id;
     var turbine_model = req.body.turbine_model;
     var component = req.body.component;
-    var symptom = req.body.symptom;
+    // Accept symptom | symptoms | symptomDescription — frontend sends "symptoms"
+    var symptom = req.body.symptom || req.body.symptoms || req.body.symptomDescription;
     var environment = req.body.environment;
     var already_tried = req.body.already_tried || [];
 
@@ -43,24 +44,55 @@ router.post("/", auth, async function (req, res) {
       return res.status(400).json({ error: "A symptom description is required" });
     }
 
-    var userMessage = [
-      "Turbine model: " + (turbine_model || "not specified"),
-      "Component: " + (component || "not specified"),
-      "Environment: " + (environment || "not specified"),
-      "Symptom: " + symptom,
-      already_tried.length > 0
-        ? "Already tried: " + already_tried.join(", ")
-        : "Already tried: nothing yet",
-    ].join("\n");
+    var userMessage = buildTroubleshootMessage(req.body, { turbine_model, component, symptom, environment, already_tried });
 
     var messages = [{ role: "user", content: userMessage }];
 
+    // CLAUDE API CALL: WindPal troubleshoot diagnosis
+    // Wind turbine troubleshoot always routes to Sonnet — all signals
+    // that matter for wind are complexity signals.
+    // See utils/modelRouter.js classifyTroubleshoot()
+    var troubleshootContext = {
+      // Prior conversation turns — multi-turn escalates to Sonnet
+      conversationHistory: req.body.conversationHistory || [],
+
+      // Symptom for safety keyword detection
+      symptom: symptom || req.body.scadaAlarmCodes || req.body.scada_alarm_codes || '',
+
+      // SCADA alarm codes present = platform-specific interpretation = Sonnet
+      hasScadaAlarms: !!(
+        (req.body.scadaAlarmCodes || req.body.scada_alarm_codes) &&
+        String(req.body.scadaAlarmCodes || req.body.scada_alarm_codes).trim()
+      ),
+
+      // Turbine manufacturer identified = platform-specific knowledge = Sonnet
+      hasManufacturer: !!(
+        (req.body.turbineManufacturer || req.body.turbine_manufacturer || turbine_model) &&
+        (req.body.turbineManufacturer || req.body.turbine_manufacturer || turbine_model) !== 'Unknown'
+      ),
+
+      // Offshore = additional marine safety, environmental factors = Sonnet
+      isOffshore: [req.body.turbineClass, req.body.turbine_class, environment]
+        .some(v => (v || '').toLowerCase().includes('offshore')),
+
+      // Drivetrain components = vibration, oil analysis, bearing knowledge = Sonnet
+      isDrivetrainComponent: ['gearbox', 'generator', 'main_bearing', 'main bearing',
+        'converter', 'drivetrain'].some(
+        k => (req.body.componentSystem || req.body.component_system || component || '')
+          .toLowerCase().includes(k)
+      ),
+
+      // 2+ already-tried steps = beyond basic reset/inspection = Sonnet
+      alreadyTriedMultiple: (already_tried?.length || 0) >= 2,
+
+      // Code/standard compliance — IEC, DNV-GL
+      requiresCodeCompliance: false,
+      isSpecialtyMaterial: false,
+    };
+
     var aiResult = await callClaude({
       feature: 'troubleshoot',
-      context: {
-        conversationHistory: [],
-        symptom: symptom || '',
-      },
+      context: troubleshootContext,
       systemPrompt: WIND_TROUBLESHOOT_SYSTEM_PROMPT,
       messages: messages,
     });
@@ -116,5 +148,70 @@ router.post("/", auth, async function (req, res) {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// Builds the user message from form fields.
+// Supports current WindPal fields (turbine_model, component, symptoms,
+// environment, already_tried) plus additional spec fields
+// (turbineManufacturer, turbinePlatform, turbineClass, componentSystem,
+// scadaAlarmCodes, operatingConditions, hubHeight) if the frontend is
+// extended later.
+function buildTroubleshootMessage(body, baseline) {
+  var lines = [];
+  var b = body || {};
+  var base = baseline || {};
+
+  var manufacturer = b.turbineManufacturer || b.turbine_manufacturer;
+  var platform = b.turbinePlatform || b.turbine_platform || base.turbine_model;
+  var turbineClass = b.turbineClass || b.turbine_class;
+  var hubHeight = b.hubHeight || b.hub_height;
+  var componentSystem = b.componentSystem || b.component_system || base.component;
+  var scadaCodes = b.scadaAlarmCodes || b.scada_alarm_codes;
+  var operating = b.operatingConditions || b.operating_conditions;
+
+  if (manufacturer && manufacturer !== 'Unknown') {
+    lines.push('Turbine manufacturer: ' + manufacturer);
+  }
+  if (platform && String(platform).trim()) {
+    lines.push('Turbine platform/model: ' + String(platform).trim());
+  }
+  if (turbineClass) lines.push('Turbine class: ' + turbineClass);
+  if (hubHeight && String(hubHeight).trim()) {
+    lines.push('Hub height: ' + String(hubHeight).trim() + ' meters');
+  }
+  if (componentSystem) {
+    var componentLabels = {
+      blade: 'Rotor blade',
+      gearbox: 'Gearbox',
+      generator: 'Generator',
+      pitch: 'Pitch system',
+      yaw: 'Yaw system',
+      electrical: 'Electrical / converter cabinet',
+      tower: 'Tower',
+      main_bearing: 'Main bearing',
+      converter: 'Power converter',
+      other: 'Other',
+    };
+    lines.push('Component/system: ' + (componentLabels[componentSystem] || componentSystem));
+  }
+  if (scadaCodes && String(scadaCodes).trim()) {
+    lines.push('SCADA alarm codes: ' + String(scadaCodes).trim());
+  }
+  if (operating && String(operating).trim()) {
+    lines.push('Operating conditions: ' + String(operating).trim());
+  }
+  if (base.environment) lines.push('Environment: ' + base.environment);
+  if (base.already_tried && base.already_tried.length > 0) {
+    lines.push('Already tried: ' + base.already_tried.join(', '));
+  }
+  if (base.symptom && String(base.symptom).trim()) {
+    lines.push('Technician description: ' + String(base.symptom).trim());
+  }
+
+  var contextBlock = lines.length > 0
+    ? lines.join('\n')
+    : 'No additional context provided.';
+
+  return contextBlock + '\n\nDiagnose this wind turbine problem and return your complete assessment as a JSON object exactly matching the schema in your instructions. State required safe state before any diagnosis.';
+}
 
 export default router;

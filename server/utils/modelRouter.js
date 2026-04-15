@@ -46,22 +46,62 @@ const SAFETY_KEYWORDS = [
   'fall', 'crush', 'entrap', 'interlock', 'governor',
 ];
 
+/**
+ * Determines complexity of a WindPal troubleshoot request.
+ * Wind turbine troubleshoot is ALWAYS complex — every realistic
+ * submission will route to Sonnet. The signals below are documented
+ * for completeness but in practice all wind turbine troubleshoot
+ * requests meet at least one complexity criterion.
+ *
+ * Signals that escalate to Sonnet:
+ *   - Multi-turn conversation (always present for wind diagnosis)
+ *   - SCADA alarm codes (platform-specific interpretation)
+ *   - Turbine manufacturer identified (platform knowledge)
+ *   - Offshore turbine (marine safety, environmental factors)
+ *   - Drivetrain component (vibration, oil analysis, bearing)
+ *   - 2+ already-tried steps (fault not clearing on reset)
+ *   - Safety-critical keywords (height, fall, rotor, energized)
+ *
+ * Simple path exists only for theoretical edge case where none of
+ * the above apply — extremely unlikely in real usage.
+ */
 function classifyTroubleshoot(params) {
-  var {
+  const {
     conversationHistory = [],
     symptom = '',
-    requiresCodeCompliance = false,
-    isSpecialtyMaterial = false,
+    hasScadaAlarms = false,
+    hasManufacturer = false,
+    isOffshore = false,
+    isDrivetrainComponent = false,
+    alreadyTriedMultiple = false,
   } = params;
 
-  var symptomLower = symptom.toLowerCase();
-  var isSafetyCritical = SAFETY_KEYWORDS.some(function (kw) {
-    return symptomLower.includes(kw);
-  });
-  var isMultiTurn = conversationHistory.length > 0;
-  var isComplex = isMultiTurn || requiresCodeCompliance ||
-                  isSpecialtyMaterial || isSafetyCritical;
+  const safetyCriticalKeywords = [
+    'fall', 'height', 'rotor', 'blade', 'nacelle', 'hub',
+    'climb', 'tower', 'energized', 'arc flash', 'lockout',
+    'fire', 'smoke', 'structural', 'crack', 'collapse',
+    'ice', 'freeze', 'offshore', 'vessel', 'lightning',
+  ];
 
+  const isSafetyCritical = safetyCriticalKeywords.some(
+    kw => symptom.toLowerCase().includes(kw)
+  );
+
+  const isMultiTurn = conversationHistory.length > 0;
+
+  // Wind turbine troubleshoot: virtually all submissions are complex
+  const isComplex = (
+    isMultiTurn           ||  // follow-up
+    hasScadaAlarms        ||  // platform-specific alarm interpretation
+    hasManufacturer       ||  // platform-specific knowledge
+    isOffshore            ||  // marine safety factors
+    isDrivetrainComponent ||  // vibration/oil/bearing analysis
+    alreadyTriedMultiple  ||  // fault not clearing on reset
+    isSafetyCritical          // height/fall/energy keywords
+  );
+
+  // In practice this is always true for WindPal
+  // Haiku path preserved for theoretical edge case only
   return isComplex ? 'complex_troubleshoot' : 'simple_troubleshoot';
 }
 
