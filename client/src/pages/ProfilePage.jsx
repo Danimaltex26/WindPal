@@ -136,7 +136,7 @@ export default function ProfilePage() {
   var isFree = !p.subscription || p.subscription === 'free';
 
   return (
-    <div className="page">
+    <div className="page stack">
       <h2 className="page-header">Profile</h2>
 
       {error && <div className="error-banner">{error}</div>}
@@ -185,24 +185,6 @@ export default function ProfilePage() {
               {usageBar(usage.ai_reference || 0, 5)}
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Upgrade to Pro */}
-      {isFree && (
-        <div className="card" style={{ textAlign: 'center', padding: '1.5rem' }}>
-          <h3 style={{ marginBottom: '0.5rem' }}>Upgrade to Pro</h3>
-          <p className="text-secondary" style={{ fontSize: '0.8125rem', marginBottom: '1rem' }}>
-            Unlimited photo analyses, troubleshoot sessions, AI reference lookups, full training content, and priority processing.
-          </p>
-          <a
-            href="https://tradepals.net/#pricing"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-primary btn-block"
-          >
-            View Pro Plans
-          </a>
         </div>
       )}
 
@@ -265,6 +247,24 @@ export default function ProfilePage() {
           })}
         </div>
       </div>
+
+      {/* Upgrade to Pro */}
+      {isFree && (
+        <div className="card" style={{ textAlign: 'center', padding: '1.5rem' }}>
+          <h3 style={{ marginBottom: '0.5rem' }}>Upgrade to Pro</h3>
+          <p className="text-secondary" style={{ fontSize: '0.8125rem', marginBottom: '1rem' }}>
+            Unlimited photo analyses, troubleshoot sessions, AI reference lookups, full training content, and priority processing.
+          </p>
+          <a
+            href="https://tradepals.net/#pricing"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-primary btn-block"
+          >
+            View Pro Plans
+          </a>
+        </div>
+      )}
 
       <div className="divider" />
 
