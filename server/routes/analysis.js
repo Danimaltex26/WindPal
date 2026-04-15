@@ -2,9 +2,8 @@ import { Router } from "express";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
 import auth from "../middleware/auth.js";
-import { callClaude } from "../utils/claudeClient.js";
-import { WIND_ANALYSIS_SYSTEM_PROMPT } from "../prompts/analysis.js";
 import { sendAnalysisReadyEmail } from "../utils/email.js";
+import { analyzeWindPhoto } from "../utils/windAnalyzer.js";
 
 var router = Router();
 var upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024 } });
@@ -42,7 +41,6 @@ router.post("/", auth, upload.array("images", 4), async function (req, res) {
       return res.status(400).json({ error: "At least one image is required" });
     }
 
-    var imageContent = [];
     var publicUrls = [];
 
     for (var i = 0; i < req.files.length; i++) {
@@ -63,49 +61,33 @@ router.post("/", auth, upload.array("images", 4), async function (req, res) {
         .from("windpal-uploads")
         .getPublicUrl(storagePath);
       publicUrls.push(urlData.data.publicUrl);
-
-      imageContent.push({
-        type: "image",
-        source: {
-          type: "base64",
-          media_type: file.mimetype || "image/jpeg",
-          data: file.buffer.toString("base64"),
-        },
-      });
     }
 
-    imageContent.push({
-      type: "text",
-      text: "Analyze this wind turbine component photo. Analysis type hint: " + (analysis_type || "general") + ". Return your analysis as the specified JSON object.",
-    });
-
-    var aiResult = await callClaude({
-      feature: 'photo_diagnosis',
-      systemPrompt: WIND_ANALYSIS_SYSTEM_PROMPT,
-      messages: [{ role: "user", content: imageContent }],
-    });
-    var rawText = aiResult.content;
-    var result;
+    // CLAUDE API CALL: wind turbine photo analysis — see /server/utils/windAnalyzer.js
+    var analysisResult;
     try {
-      var stripped = rawText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
-      try {
-        result = JSON.parse(stripped);
-      } catch (e) {
-        var start = stripped.indexOf("{");
-        if (start === -1) throw new Error("No JSON found");
-        var depth = 0;
-        var end = -1;
-        for (var j = start; j < stripped.length; j++) {
-          if (stripped[j] === "{") depth++;
-          else if (stripped[j] === "}") { depth--; if (depth === 0) { end = j; break; } }
-        }
-        if (end === -1) throw new Error("Unbalanced JSON");
-        result = JSON.parse(stripped.slice(start, end + 1));
+      analysisResult = await analyzeWindPhoto({
+        imageBase64: req.files[0].buffer.toString("base64"),
+        imageMediaType: req.files[0].mimetype || "image/jpeg",
+        analysisType: analysis_type,
+        turbineManufacturer: req.body.turbine_manufacturer,
+        turbinePlatform: req.body.turbine_platform,
+        turbineClass: req.body.turbine_class,
+        componentHeight: req.body.component_height,
+        symptoms: req.body.symptoms,
+        userNotes: req.body.user_notes,
+        userId: userId,
+      });
+    } catch (error) {
+      if (error.type === 'api_error' || error.type === 'parse_error' || error.type === 'validation_error') {
+        return res.status(error.status || 500).json({
+          error: error.userMessage || 'Analysis failed. Please try again.'
+        });
       }
-    } catch (parseErr) {
-      console.error("Parse error:", parseErr.message, rawText);
-      return res.status(500).json({ error: "Failed to parse analysis result", raw: rawText });
+      throw error;
     }
+
+    var result = analysisResult.analysis;
 
     var insertResult = await supabaseService
       .from("turbine_analyses")
@@ -113,10 +95,10 @@ router.post("/", auth, upload.array("images", 4), async function (req, res) {
         user_id: userId,
         image_urls: publicUrls,
         analysis_type: result.analysis_type || analysis_type || "general",
-        diagnosis: result.overall_diagnosis || result.plain_english_summary,
-        recommended_action: result.recommended_action,
+        diagnosis: result.assessment_reasoning || result.overall_assessment,
+        recommended_action: result.prioritized_actions && result.prioritized_actions[0] ? result.prioritized_actions[0].action : null,
         confidence: result.confidence,
-        severity: result.severity || "observation",
+        severity: result.overall_assessment || "observation",
         full_response_json: result,
         saved: false,
       })
@@ -125,7 +107,7 @@ router.post("/", auth, upload.array("images", 4), async function (req, res) {
 
     if (insertResult.error) {
       console.error("Save error:", insertResult.error);
-      return res.json({ result: result, saved: false, save_error: insertResult.error.message, model: aiResult.model });
+      return res.json({ result: result, saved: false, save_error: insertResult.error.message, model: analysisResult.model });
     }
 
     // Only send email for offline-queued analyses
@@ -138,7 +120,7 @@ router.post("/", auth, upload.array("images", 4), async function (req, res) {
       }).catch(function () {});
     }
 
-    return res.json({ result: result, record_id: insertResult.data.id, model: aiResult.model });
+    return res.json({ result: result, record_id: insertResult.data.id, model: analysisResult.model });
   } catch (err) {
     console.error("Turbine analysis error:", err);
     return res.status(500).json({ error: "Internal server error" });
