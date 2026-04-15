@@ -35,7 +35,7 @@ async function generateQuestions(certLevel, moduleTitle, topics, count) {
     while (retries < 2) {
       try {
         var response = await anthropic.messages.create({
-          model: "claude-sonnet-4-20250514", max_tokens: 4096,
+          model: "claude-sonnet-4-6", max_tokens: 4096,
           system: prompt,
           messages: [{ role: "user", content: "Generate " + diffCount + " " + difficulty + "-level questions for " + moduleTitle + ". Topics: " + topicStr }],
         });

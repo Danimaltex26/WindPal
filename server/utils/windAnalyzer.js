@@ -83,7 +83,7 @@ export async function analyzeWindPhoto(params) {
     userNotes
   });
 
-  // MODEL: claude-sonnet-4-20250514
+  // MODEL: claude-sonnet-4-6
   // Photo diagnosis always uses Sonnet — vision quality matters here.
   // temperature: 0.2 — consistent, precise safety-critical diagnosis
   // max_tokens: 1800 — blade defect analysis with multiple defects
@@ -99,7 +99,7 @@ export async function analyzeWindPhoto(params) {
       attempt++;
 
       response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 1800,
         temperature: 0.2,
         system: WINDPAL_SYSTEM_PROMPT,

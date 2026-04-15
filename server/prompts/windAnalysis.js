@@ -1,7 +1,7 @@
 /**
  * WindPal Photo Analyzer — System Prompt and Message Builder
  *
- * MODEL: claude-sonnet-4-20250514
+ * MODEL: claude-sonnet-4-6
  * Photo diagnosis always uses Sonnet — vision quality gap is significant.
  * See hybrid model strategy in /server/utils/modelRouter.js
  *
