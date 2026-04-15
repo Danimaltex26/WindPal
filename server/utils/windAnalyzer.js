@@ -118,6 +118,16 @@ export async function analyzeWindPhoto(params) {
         continue;
       }
 
+      console.error('[WindPal Analyzer] Anthropic API error:', {
+        name: apiError.name,
+        status: apiError.status,
+        message: apiError.message,
+        cause: apiError.cause?.message || apiError.cause,
+        error: apiError.error,
+        body: apiError.response?.data || apiError.body,
+        stringified: String(apiError)
+      });
+
       throw {
         type: 'api_error',
         status: apiError.status || 500,
