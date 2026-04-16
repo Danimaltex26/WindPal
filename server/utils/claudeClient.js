@@ -50,7 +50,16 @@ export async function callClaude(options) {
       var response = await anthropic.messages.create({
         model: config.model,
         max_tokens: config.max_tokens,
-        system: systemPrompt,
+        // PROMPT CACHING: all system prompts cached via claudeClient
+        // Applies to troubleshoot, reference, and any other callClaude() feature
+        // Cache window: 5 minutes — resets on each cache hit
+        system: [
+          {
+            type: 'text',
+            text: systemPrompt,
+            cache_control: { type: 'ephemeral' }
+          }
+        ],
         messages: messages,
       });
 

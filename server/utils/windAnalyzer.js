@@ -102,7 +102,16 @@ export async function analyzeWindPhoto(params) {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1800,
         temperature: 0.2,
-        system: WINDPAL_SYSTEM_PROMPT,
+        // PROMPT CACHING: system prompt cached at Anthropic for 5min window
+        // Cache hits cost $0.30/M vs $3.00/M — ~90% reduction on system prompt tokens
+        // cache_control: ephemeral is the correct type for this use case
+        system: [
+          {
+            type: 'text',
+            text: WINDPAL_SYSTEM_PROMPT,
+            cache_control: { type: 'ephemeral' }
+          }
+        ],
         messages: messages
       });
 
