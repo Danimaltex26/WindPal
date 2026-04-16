@@ -273,7 +273,7 @@ router.post("/exam/submit", async (req, res) => {
       : null;
 
     // Create exam attempt record
-    await supabase
+    const { data: attemptRow } = await supabase
       .from("training_exam_attempts")
       .insert({
         user_id: userId,
@@ -291,7 +291,9 @@ router.post("/exam/submit", async (req, res) => {
         questions_detail: questionsDetail,
         started_at: examState.started_at,
         completed_at: now,
-      });
+      })
+      .select("id")
+      .single();
 
     // Create test session record
     await supabase
@@ -323,6 +325,7 @@ router.post("/exam/submit", async (req, res) => {
     }
 
     res.json({
+      attempt_id: attemptRow?.id,
       attemptNumber,
       totalQuestions,
       correctCount: totalCorrect,

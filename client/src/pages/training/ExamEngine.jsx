@@ -183,7 +183,7 @@ export default function ExamEngine() {
           data = await apiPost('/training/exam/start', { cert_level: certLevel, mode });
           setQuestions(data.questions || []);
           setExamMeta(data.meta || {});
-          setAttemptId(data.attempt_id);
+          setAttemptId(data.examStateId);
         } else {
           data = await apiPost('/training/practice/start', { cert_level: certLevel, mode });
           setQuestions(data.questions || []);
@@ -202,10 +202,10 @@ export default function ExamEngine() {
     if (!isExamMode || !attemptId) return;
     saveTimerRef.current = setInterval(() => {
       apiPost('/training/exam/save-state', {
-        attempt_id: attemptId,
-        answers,
-        flagged,
-        current_index: current,
+        examStateId: attemptId,
+        answersJson: answers,
+        currentQuestionIndex: current,
+        reviewFlaggedIds: Object.keys(flagged).filter((k) => flagged[k]).map(Number),
       }).catch(() => {});
     }, 5000);
     return () => clearInterval(saveTimerRef.current);
@@ -254,10 +254,7 @@ export default function ExamEngine() {
     clearInterval(saveTimerRef.current);
     try {
       const resp = await apiPost('/training/exam/submit', {
-        attempt_id: attemptId,
-        answers,
-        cert_level: certLevel,
-        mode,
+        examStateId: attemptId,
       });
       navigate(`/training/${certLevel}/exam/score/${resp.attempt_id || attemptId}`);
     } catch {
