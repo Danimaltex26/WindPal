@@ -441,4 +441,65 @@ router.get("/exam/history/:certLevel", async (req, res) => {
   }
 });
 
+// GET /exam/score/:attemptId — Full score report for one attempt
+router.get("/exam/score/:attemptId", async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { attemptId } = req.params;
+
+    const { data: attempt, error } = await supabase
+      .from("training_exam_attempts")
+      .select("*")
+      .eq("id", attemptId)
+      .eq("user_id", userId)
+      .single();
+
+    if (error || !attempt) {
+      return res.status(404).json({ error: "Attempt not found" });
+    }
+
+    const { data: prior } = await supabase
+      .from("training_exam_attempts")
+      .select("id, attempt_number, score_percent, passed, completed_at")
+      .eq("user_id", userId)
+      .eq("cert_level", attempt.cert_level)
+      .neq("id", attemptId)
+      .order("completed_at", { ascending: false })
+      .limit(10);
+
+    const domainScores = attempt.domain_scores || {};
+    const domains = Object.entries(domainScores).map(([domain, v]) => ({
+      domain,
+      correct: v.correct || 0,
+      total: v.total || 0,
+      percent: v.percent != null ? v.percent : (v.total > 0 ? Math.round((v.correct / v.total) * 100) : 0),
+    }));
+
+    const weakestDomain = domains.length > 0
+      ? domains.reduce((min, d) => (d.percent < min.percent ? d : min), domains[0]).domain
+      : null;
+
+    res.json({
+      passed: attempt.passed,
+      score: attempt.score_percent,
+      correct: attempt.correct_count,
+      total: attempt.total_questions,
+      pass_threshold: attempt.pass_threshold,
+      domains,
+      time_seconds: attempt.time_taken_seconds,
+      previous_attempts: (prior || []).map((a) => ({
+        id: a.id,
+        attempt_number: a.attempt_number,
+        score: a.score_percent,
+        passed: a.passed,
+        completed_at: a.completed_at,
+      })),
+      weakest_domain: weakestDomain,
+    });
+  } catch (err) {
+    console.error("GET /exam/score/:attemptId error:", err);
+    res.status(500).json({ error: "Failed to load exam score" });
+  }
+});
+
 export default router;
