@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { apiGet, apiPatch } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import Paywall from '../components/Paywall';
+import { getManagementURL } from '../utils/revenuecat';
 
 var SPECIALTIES = [
   'Blade Repair',
@@ -261,7 +262,7 @@ export default function ProfilePage() {
             </div>
             <span className="badge badge-green">Pro</span>
           </div>
-          <button className="btn btn-secondary btn-block" style={{ marginTop: '0.75rem' }} onClick={async () => { const { getManagementURL } = await import('../utils/revenuecat'); const url = await getManagementURL(); if (url) window.open(url, '_blank'); }}>Manage Subscription</button>
+          <button className="btn btn-secondary btn-block" style={{ marginTop: '0.75rem' }} onClick={async () => { const url = await getManagementURL(); if (url) window.open(url, '_blank'); }}>Manage Subscription</button>
         </div>
       )}
 
