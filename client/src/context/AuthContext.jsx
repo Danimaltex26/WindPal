@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../utils/supabase';
+import { initRevenueCat } from '../utils/revenuecat';
 
 const AuthContext = createContext(null);
 
@@ -15,12 +16,14 @@ export function AuthProvider({ children }) {
       var s = result.data.session;
       setSession(s);
       setUser(s ? s.user : null);
+      if (s && s.user && s.user.id) initRevenueCat(s.user.id);
       setLoading(false);
     });
 
     var sub = supabase.auth.onAuthStateChange(function (_event, s) {
       setSession(s);
       setUser(s ? s.user : null);
+      if (s && s.user && s.user.id) initRevenueCat(s.user.id);
       setLoading(false);
     });
 
