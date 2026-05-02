@@ -893,7 +893,6 @@ export default function InspectPage() {
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             multiple
             onChange={handleUpload}
             style={{ display: 'none' }}
