@@ -46,6 +46,7 @@ export default function InspectPage() {
   const [error, setError] = useState('');
   const [queued, setQueued] = useState(false);
   var fileInputRef = useRef(null);
+  var cameraInputRef = useRef(null);
   const offlineQueue = useOfflineQueue();
 
   async function handleUpload(e) {
@@ -61,6 +62,8 @@ export default function InspectPage() {
       await offlineQueue.enqueue(files, componentType);
       setQueued(true);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
       return;
     }
 
@@ -89,6 +92,8 @@ export default function InspectPage() {
     } finally {
       setLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
     }
   }
 
@@ -98,6 +103,7 @@ export default function InspectPage() {
     setError('');
     setQueued(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
   }
 
   function handleViewQueueResult(item) {
@@ -850,6 +856,7 @@ export default function InspectPage() {
         {/* Upload Area */}
         <label
           style={{
+            position: 'relative',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -878,6 +885,31 @@ export default function InspectPage() {
             }
           }}
         >
+          <button
+            type="button"
+            onClick={function (e) { e.preventDefault(); e.stopPropagation(); if (cameraInputRef.current) cameraInputRef.current.click(); }}
+            aria-label="Take photo with camera"
+            title="Take photo with camera"
+            style={{
+              position: 'absolute',
+              top: 12,
+              right: 12,
+              background: 'rgba(0,0,0,0.55)',
+              border: 'none',
+              borderRadius: 8,
+              padding: 8,
+              cursor: 'pointer',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
+          </button>
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="17 8 12 3 7 8" />
@@ -894,6 +926,14 @@ export default function InspectPage() {
             type="file"
             accept="image/*"
             multiple
+            onChange={handleUpload}
+            style={{ display: 'none' }}
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
             onChange={handleUpload}
             style={{ display: 'none' }}
           />
