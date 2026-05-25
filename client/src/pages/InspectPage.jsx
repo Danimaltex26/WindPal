@@ -46,6 +46,7 @@ export default function InspectPage() {
   const [error, setError] = useState('');
   const [queued, setQueued] = useState(false);
   var fileInputRef = useRef(null);
+  var cameraInputRef = useRef(null);
   const offlineQueue = useOfflineQueue();
 
   async function handleUpload(e) {
@@ -61,6 +62,7 @@ export default function InspectPage() {
       await offlineQueue.enqueue(files, componentType);
       setQueued(true);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
       return;
     }
 
@@ -89,6 +91,7 @@ export default function InspectPage() {
     } finally {
       setLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
     }
   }
 
@@ -98,6 +101,7 @@ export default function InspectPage() {
     setError('');
     setQueued(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
   }
 
   function handleViewQueueResult(item) {
@@ -848,7 +852,7 @@ export default function InspectPage() {
         </div>
 
         {/* Upload Area */}
-        <label
+        <div
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -858,7 +862,6 @@ export default function InspectPage() {
             minHeight: 220,
             border: '2px dashed #2A2A2E',
             borderRadius: 16,
-            cursor: 'pointer',
             padding: '2rem',
             textAlign: 'center',
             transition: 'border-color 0.15s',
@@ -884,10 +887,28 @@ export default function InspectPage() {
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
           <div>
-            <p style={{ fontSize: '1.0625rem', fontWeight: 600 }}>Tap to upload or take a photo</p>
+            <p style={{ fontSize: '1.0625rem', fontWeight: 600 }}>Add a photo to analyze</p>
             <p className="text-muted" style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
               Photo of blades, gearbox, generator, tower, or nacelle (up to 4)
             </p>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'center' }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={function () { if (cameraInputRef.current) cameraInputRef.current.click(); }}
+              style={{ backgroundColor: '#22D3EE', color: '#0f0f10', border: 'none', minWidth: 160 }}
+            >
+              📷 Take Photo
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={function () { if (fileInputRef.current) fileInputRef.current.click(); }}
+              style={{ minWidth: 180 }}
+            >
+              📁 Choose from Library
+            </button>
           </div>
           <input
             ref={fileInputRef}
@@ -897,7 +918,15 @@ export default function InspectPage() {
             onChange={handleUpload}
             style={{ display: 'none' }}
           />
-        </label>
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleUpload}
+            style={{ display: 'none' }}
+          />
+        </div>
 
         {/* Offline Queue */}
         <OfflineQueue
