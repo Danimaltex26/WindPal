@@ -119,7 +119,7 @@ router.post("/", auth, upload.array("images", 4), async function (req, res) {
 
     // Only send email for offline-queued analyses
     if (req.body.queued) {
-      sendAnalysisReadyEmail({
+      await sendAnalysisReadyEmail({
         to: req.user.email,
         appKey: "windpal",
         displayName: req.profile.display_name,
